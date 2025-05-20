@@ -1,0 +1,40 @@
+domain cmu_scheduling {
+    types {
+        job : object;
+    };
+
+    pvariables {
+        MU(job)   : {non-fluent, real, default = 0.0};
+        COST(job) : {non-fluent, real, default = 0.0};
+        finished(job) : {state-fluent, bool, default = false};
+        process_job(job) : {action-fluent, bool, default = false};
+    };
+
+    cpfs {
+        finished'(?j) = if (finished(?j)) then true
+                         else if (process_job(?j)) then Bernoulli(MU(?j))
+                         else false;
+    };
+
+    reward = - (sum_{?j : job} (if (~finished(?j)) then COST(?j) else 0.0));
+
+    action-preconditions {
+        // Condition 1: If there are unfinished jobs, then at least one job must be processed.
+        // (exists_{?k : job} (~finished(?k))) => (exists_{?j : job} (process_job(?j)));
+
+        // Condition 2: At most one job can be processed at any time.
+        // This means for any pair of distinct jobs j1, j2, they cannot both be processed.
+    forall_{?j1 : job, ?j2 : job}
+        ( (?j1 == ?j2) | ~process_job(?j1) | ~process_job(?j2) );
+
+        // Condition 3: If all jobs are finished, then no job should be processed.
+        (forall_{?k : job} (finished(?k))) => (forall_{?j : job} (~process_job(?j)));
+
+        // Condition 4: Only unfinished jobs can be processed. (Keep this one)
+        forall_{?j : job} (process_job(?j) => ~finished(?j));
+    };
+
+    termination {
+        forall_{?j : job} (finished(?j));
+    };
+}

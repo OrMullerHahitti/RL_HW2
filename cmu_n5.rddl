@@ -1,0 +1,40 @@
+instance cmu_n5_inst {
+    domain = cmu_scheduling; // Must match the domain name above
+
+    objects {
+        job : {j1, j2, j3, j4, j5}; // N=5 jobs
+    };
+
+    non-fluents {
+        // Parameters for the 5 jobs from the problem description:
+        // job i | µ_i | c_i
+        // ------|-----|----
+        //   1   | 0.6 |  1
+        //   2   | 0.5 |  4
+        //   3   | 0.3 |  6
+        //   4   | 0.7 |  2
+        //   5   | 0.1 |  9
+
+        MU(j1) = 0.6; COST(j1) = 1;
+        MU(j2) = 0.5; COST(j2) = 4;
+        MU(j3) = 0.3; COST(j3) = 6;
+        MU(j4) = 0.7; COST(j4) = 2;
+        MU(j5) = 0.1; COST(j5) = 9;
+    };
+
+    // Initial state: all jobs are unfinished.
+    // This is usually the default for boolean state-fluents (false),
+    // but can be made explicit if needed.
+    // init-state {
+    //     ~finished(j1);
+    //     ~finished(j2);
+    //     ~finished(j3);
+    //     ~finished(j4);
+    //     ~finished(j5);
+    // };
+
+    max-nondef-actions = 1; // At most one 'process_job' action will be true.
+    horizon  = 100;         // Set a sufficiently large horizon for all jobs to complete.
+                            // For N=5, 100 should be more than enough.
+    discount = 1.0;         // Since we want to minimize total (undiscounted) cost.
+}
