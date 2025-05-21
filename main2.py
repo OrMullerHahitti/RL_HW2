@@ -1,8 +1,12 @@
+import math
+
 import numpy as np
 import matplotlib.pyplot as plt
 from pyRDDLGym import RDDLEnv
 import random  # For simple policies or exploration
+import time    # For timing policy evaluation
 
+np.random.seed(42)
 # --- RDDL Setup for Question 2 ---
 RDDL_DOMAIN_Q2_FILE = "cmu_domain.rddl"
 RDDL_INSTANCE_Q2_FILE = "cmu_n5.rddl"
@@ -102,9 +106,6 @@ def run_q2_simulation_episode(env, policy_func, job_names_list,**kwargs):
             # print(f"Episode finished at step {t+1}. Reason: {'Terminated' if terminated else 'Truncated'}")
             break
 
-    # print(f"Final RDDL State: {state}")
-    # print(f"Final Finished Mask: {get_finished_mask(state):0{N_JOBS_N5}b}")
-    # print(f"Total Reward (Negative Cost): {total_reward}, Steps: {steps}\n")
     return total_reward, steps
 
 
@@ -133,27 +134,60 @@ if __name__ == "__main__":
     print_mdp_details()
 
     # Initialize pyRDDLGym environment for Question 2
-    try:
-        env_q2 = RDDLEnv(domain=RDDL_DOMAIN_Q2_FILE, instance=RDDL_INSTANCE_Q2_FILE)
-    except Exception as e:
-        print(f"Error initializing RDDLEnv for Q2: {e}")
-        print(f"Ensure RDDL files '{RDDL_DOMAIN_Q2_FILE}' and '{RDDL_INSTANCE_Q2_FILE}' are correct.")
-        exit()
+    env_q2 = RDDLEnv(domain=RDDL_DOMAIN_Q2_FILE, instance=RDDL_INSTANCE_Q2_FILE)
 
     model = env_q2.model
+
     costs = model.non_fluents['COST']
-    print("\n--- Running a few episodes with a Random Policy ---")
+
+    print("\n---Random Policy ---")
     num_random_episodes = 3
     for i in range(num_random_episodes):
         print(f"Random Policy Episode {i + 1}:")
         ep_total_reward, ep_steps = run_q2_simulation_episode(env_q2, random_policy_q2, JOB_NAMES_N5)
         print(f"  Total Reward (Negative Cost): {ep_total_reward:.2f}, Steps Taken: {ep_steps}")
+
+    #maximum cost policy
+    # Separate rewards and steps
+
+
+    import matplotlib.pyplot as plt
+
+
+
+
     li =[]
-    for i in range(20):
+
+    for i in range(100):
         print(f"Max Cost Policy Episode {i + 1}:")
         ep_total_reward, ep_steps = run_q2_simulation_episode(env_q2, max_cost_policy_q2, JOB_NAMES_N5,costs_arr=costs)
-        li.append(ep_total_reward)
+        li.append((ep_total_reward, ep_steps))
 
+    rewards = [x[0] for x in li]
+    steps = [x[1] for x in li]
+
+
+    flierprops={'marker': 'o', 'markersize': 4, 'alpha': 0.6}
+
+
+    colors = ['#6baed6', '#fd8d3c']
+
+    plt.figure(figsize=(10, 6))
+    box = plt.boxplot(
+        rewards,
+        widths=0.5,
+    )
+
+
+    plt.title('Policy evaluation for pi_c over 100 episodes', fontsize=16)
+    plt.xlabel(f'V(S_0) mean : {np.mean(li[0])}')
+    plt.ylabel('V(S_0)')
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.savefig("boxplot.png")
+    plt.show()
+
+    #bellman equations
     job_objs = sorted(model.object_to_type)
     MU = np.array(model.non_fluents['MU'])
     COSTS = np.array(model.non_fluents['COST'])
@@ -181,56 +215,220 @@ if __name__ == "__main__":
 
 
     # --------------------------------------------------------------------------
-    #  π_c  – choose unfinished job with largest *cost* c_i --------------------
-    pi_c = np.full(N_STATE, -1, dtype=int)
+    #  π_c  – choose unfini`shed job with largest *cost* c_i --------------------
+    def run_belman_starting_pi_c():
+        pi_c = np.full(N_STATE, -1, dtype=int)
+        for m in range(ALL_DONE):
+            jobs_left = [i for i in range(N_JOBS_N5) if not (m & (1 << i))]
+            pi_c[m] = max(jobs_left, key=lambda i: COSTS[i])
+
+        V_pi_c = eval_policy_bellman(pi_c)
+        print(f"\nTheoretical value under π_c   : Vπc(s0) = {V_pi_c[0]:.2f}")
+
+        # ---------- run one *simulation* episode with π_c -------------------------
+        print("\nRunning simulation with π_c (max cost policy):")
+        ep_total_reward, ep_steps = run_q2_simulation_episode(env_q2, max_cost_policy_q2, JOB_NAMES_N5, costs_arr=COSTS)
+        V_trace = [V_pi_c[0]]  # Track value of initial state across iterations
+        pi = pi_c.copy()       # Start with the max cost policy
+        improve_it = 0         # Count improvement iterations
+
+
+        # Policy iteration loop
+        while True:
+            # Policy evaluation step
+            V = eval_policy_bellman(pi)
+
+            # Policy improvement step
+            stable = True
+            for m in range(ALL_DONE):
+                best_j, best_val = pi[m], V[m]
+
+                # Try all possible actions (jobs) in this state
+                for j in range(N_JOBS_N5):
+                    if m & (1 << j):  # Skip if job j is already finished
+                        continue
+
+
+                    cand_val = SUMC[m] / MU[j] + V[m | (1 << j)]
+
+                    # If better than current best, update
+                    if cand_val < best_val - 1e-12:  # Small epsilon for numerical stability
+                        best_val, best_j = cand_val, j
+
+                # If policy changed for this state, mark as unstable
+                if best_j != pi[m]:
+                    pi[m] = best_j
+                    stable = False
+
+            # Evaluate new policy and track value
+            V_new = eval_policy_bellman(pi)
+            V_trace.append(V_new[0])
+            improve_it += 1
+
+            # Print progress
+            print(f"Iteration {improve_it}: V(s0) = {V_new[0]:.2f}")
+
+            # Check for convergence
+            if stable:
+                break
+
+
+    # Report results
+
+
+    # --------------------------------------------------------------------------
+    #  Implement cµ law policy ------------------------------------------------
+    print("\n--- Implementing cµ law policy ---")
+
+    # cµ law: choose job with highest c_i * µ_i value
+    pi_cmu = np.full(N_STATE, -1, dtype=int)
     for m in range(ALL_DONE):
         jobs_left = [i for i in range(N_JOBS_N5) if not (m & (1 << i))]
-        pi_c[m] = max(jobs_left, key=lambda i: COSTS[i])
+        if jobs_left:
+            pi_cmu[m] = max(jobs_left, key=lambda i: COSTS[i] * MU[i])
 
-    V_pi_c = eval_policy_bellman(pi_c)
-    print(f"\nTheoretical value under π_c   : Vπc(s0) = {V_pi_c[0]:.2f}")
+    # Evaluate cµ law policy
+    V_pi_cmu = eval_policy_bellman(pi_cmu)
+    print(f"Value under cµ law policy: V_cmu(s0) = {V_pi_cmu[0]:.2f}")
 
-    # ---------- run one *simulation* episode with π_c -------------------------
+    # Define optimal policy from policy iteration
 
 
-    # --------------------------------------------------------------------------
-    #  Policy-iteration starting from π_c --------------------------------------
-    V_trace = [V_pi_c[0]]
-    pi = pi_c.copy()
-    improve_it = 0
+    # Compare policies
+    print("\n--- Comparing Policies ---")
+    print(f"Value under π_c (max cost)   : V_c(s0) = {V_pi_c[0]:.2f}")
+    print(f"Value under cµ law           : V_cmu(s0) = {V_pi_cmu[0]:.2f}")
+    print(f"Value under optimal policy π*: V*(s0) = {V_pi_star:.2f}")
 
-    while True:
-        V = eval_policy_bellman(pi)  # policy evaluation
-        # ------- improvement step ---------------------------------------------
-        stable = True
-        for m in range(ALL_DONE):
-            best_j, best_val = pi[m], V[m]
-            for j in range(N_JOBS_N5):
-                if m & (1 << j):  # already finished
-                    continue
-                cand_val = SUMC[m] / MU[j] + V[m | (1 << j)]
-                if cand_val < best_val - 1e-12:
-                    best_val, best_j = cand_val, j
-            if best_j != pi[m]:
-                pi[m] = best_j
-                stable = False
-        V_new = eval_policy_bellman(pi)
-        V_trace.append(V_new[0])
-        improve_it += 1
-        if stable:
-            break
+    # Run simulation with cµ law policy
+    def cmu_policy_q2(rddl_state, job_names, costs_arr, mu_arr):
+        """Pick the unfinished job with the largest c_i * µ_i value."""
+        mask = get_finished_mask(rddl_state)
+        unfinished = get_unfinished_job_indices(mask)
 
-    print(f"Optimal value V*(s0)            : {V_trace[-1]:.2f}")
-    print(f"Policy-iteration improvement steps needed: {improve_it}")
+        if not unfinished:
+            return {}  # all jobs done
+
+        # choose arg-max c_i * µ_i among unfinished
+        chosen_idx = max(unfinished, key=lambda i: costs_arr[i] * mu_arr[i])
+        chosen_name = job_names[chosen_idx]
+        return {f"process_job___{chosen_name}": True}
+
+    print("\nRunning simulation with cµ law policy:")
+    ep_total_reward, ep_steps = run_q2_simulation_episode(env_q2, cmu_policy_q2, JOB_NAMES_N5, 
+                                                         costs_arr=COSTS, mu_arr=MU)
+    print(f"  Total Reward (Negative Cost): {ep_total_reward:.2f}, Steps Taken: {ep_steps}")
 
     # --------------------------------------------------------------------------
-    #  PLOT:  V(s0) during policy iteration ------------------------------------
-    plt.figure(figsize=(6, 4))
-    plt.plot(range(len(V_trace)), V_pi_c[0], marker='o')
+    #  PLOTS: Visualize results -----------------------------------------------
+    print("\n--- Creating Plots ---")
+
+    # PLOT 1: Value of initial state during policy iteration
+    print("Plot 1: Value of initial state during policy iteration")
+    plt.figure(figsize=(10, 6))
+
+    # Plot the value trace during policy iteration
+    plt.plot(range(len(V_trace)), V_trace, marker='o', linewidth=2, 
+             label='V(s₀) during policy iteration')
+
+    # Add reference lines for different policies
+    plt.axhline(y=V_pi_c[0], color='r', linestyle='--', linewidth=2, 
+                label='V(s₀) for π_c (max cost policy)')
+    plt.axhline(y=V_pi_cmu[0], color='g', linestyle='--', linewidth=2, 
+                label='V(s₀) for cµ law policy')
+
+    # Customize plot
     plt.xticks(range(len(V_trace)))
-    plt.xlabel("Policy-iteration step")
-    plt.ylabel("V(s₀)")
-    plt.title("Policy-evaulation for π_c)")
+    plt.xlabel("Policy-iteration step", fontsize=12)
+    plt.ylabel("Value V(s₀)", fontsize=12)
+    plt.title("Value of Initial State During Policy Iteration", fontsize=14)
+    plt.legend(fontsize=10)
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig("plots_q2_pi_c.png")
+
+    # Save plot
+    plt.savefig("policy_iteration_convergence.png")
+    print("Saved plot to: policy_iteration_convergence.png")
+
+    # PLOT 2: Comparison of policy values (V π* vs. V πc vs. V cµ)
+    print("Plot 2: Comparison of policy values")
+    plt.figure(figsize=(10, 6))
+
+    # Data for bar chart
+    policies = ['π_c (max cost)', 'cµ law', 'π* (optimal)']
+    values = [V_pi_c[0], V_pi_cmu[0], V_pi_star]
+    colors = ['#3498db', '#2ecc71', '#e74c3c']  # Blue, Green, Red
+
+    # Create bar chart
+    bars = plt.bar(policies, values, color=colors, width=0.6)
+
+    # Add value labels on top of bars
+    for bar in bars:
+        height = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width()/2., height + 0.1,
+                f'{height:.2f}', ha='center', fontsize=12)
+
+    # Customize plot
+    plt.ylabel('Value V(s₀)', fontsize=12)
+    plt.title('Comparison of Policy Values', fontsize=14)
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+
+    # Save plot
+    plt.savefig("policy_comparison.png")
+    print("Saved plot to: policy_comparison.png")
+
+    # Print policy decisions for each state (for small number of states)
+    if N_JOBS_N5 <= 5:  # Only print for small instances
+        print("\n--- Policy Decisions for Each State ---")
+        print("State (binary) | π_c | cµ law | π*")
+        print("-" * 40)
+        for m in range(N_STATE):
+            if m == ALL_DONE:
+                continue  # Skip terminal state
+            state_bin = format(m, f'0{N_JOBS_N5}b')
+            print(f"{state_bin} | j{pi_c[m]+1} | j{pi_cmu[m]+1} | j{pi_star[m]+1}")
+
+    # --------------------------------------------------------------------------
+    #  Summary and Conclusions ------------------------------------------------
+    print("\n" + "="*70)
+    print("SUMMARY OF RESULTS".center(70))
+    print("="*70)
+
+    # Policy comparison
+    print("\n1. Policy Values Comparison:")
+    print(f"   - π_c (max cost policy)  : {V_pi_c[0]:.2f}")
+    print(f"   - cµ law policy          : {V_pi_cmu[0]:.2f}")
+    print(f"   - π* (optimal policy)    : {V_pi_star:.2f}")
+
+    # Performance improvement
+    pi_c_improvement = ((V_pi_c[0] - V_pi_star) / V_pi_c[0]) * 100
+    cmu_improvement = ((V_pi_cmu[0] - V_pi_star) / V_pi_cmu[0]) * 100
+    print("\n2. Performance Improvement:")
+    print(f"   - π* improves over π_c by {pi_c_improvement:.2f}%")
+    print(f"   - π* improves over cµ law by {cmu_improvement:.2f}%")
+
+    # Policy iteration convergence
+    print("\n3. Policy Iteration:")
+    print(f"   - Convergence steps required: {improve_it}")
+    print(f"   - Initial value (π_c): {V_trace[0]:.2f}")
+    print(f"   - Final value (π*): {V_trace[-1]:.2f}")
+
+    # Comparison to cµ law
+    if abs(V_pi_cmu[0] - V_pi_star) < 1e-6:
+        cmu_optimality = "The cµ law policy is optimal for this problem!"
+    elif V_pi_cmu[0] - V_pi_star < 1:
+        cmu_optimality = "The cµ law policy is very close to optimal."
+    else:
+        cmu_optimality = "The cµ law policy is not optimal for this problem."
+
+    print("\n4. Comparison to cµ Law:")
+    print(f"   - {cmu_optimality}")
+
+    # Generated plots
+    print("\n5. Generated Plots:")
+    print("   - policy_iteration_convergence.png: Shows how V(s₀) changes during policy iteration")
+    print("   - policy_comparison.png: Compares the values of different policies")
+
+    print("\nAnalysis complete. Check the generated plots for visualization.")
+    print("="*70)
