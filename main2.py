@@ -206,8 +206,7 @@ def rddl_state_to_tuple(rddl_state, job_names):
 
 
 def get_valid_actions_indices(rddl_state):
-    """Get list of valid actions (unfinished job indices) from RDDL state.
-    Reuses your existing get_finished_mask and get_unfinished_job_indices functions."""
+    """Get list of valid actions (unfinished job indices) from RDDL state."""
     mask = get_finished_mask(rddl_state)
     return get_unfinished_job_indices(mask)
 
@@ -220,13 +219,11 @@ def action_idx_to_rddl(action_idx, job_names):
     return {f"process_job___{job_name}": True}
 
 
-# Improved TD(0) that builds on your existing structure
 def td_0_policy_evaluation_improved(env, policy_func, job_names, costs_arr,
                                     step_size_schedule='constant', alpha_constant=0.01,
                                     num_episodes=1000, V_true=None, gamma=1.0):
     """
     TD(0) algorithm for policy evaluation with different step-size schedules.
-    Uses your existing policy function structure and state representations.
     """
     # Initialize value function and visit counts
     V = np.zeros(len(all_states))
@@ -249,7 +246,6 @@ def td_0_policy_evaluation_improved(env, policy_func, job_names, costs_arr,
             # Update visit count
             visit_counts[state_idx] += 1
 
-            # Get action from your existing policy function
             action_dict = policy_func(rddl_state, job_names, costs_arr)
 
             # Check if all jobs are done
@@ -295,13 +291,12 @@ def td_0_policy_evaluation_improved(env, policy_func, job_names, costs_arr,
     return V, errors_inf, errors_s0, visit_counts
 
 
-# Q-Learning that integrates with your existing code
+
 def q_learning_integrated(env, job_names, step_size_schedule='constant', alpha_constant=0.01,
                           epsilon=0.1, num_episodes=5000, V_star=None, gamma=1.0):
     """
-    Q-learning algorithm that integrates with your existing state representation.
+    Q-learning algorithm that integrates with  existing state representation.
     """
-    # Initialize Q-function and visit counts using your existing state structure
     Q = np.zeros((len(all_states), N))  # |States| x |Actions|
     visit_counts = np.zeros((len(all_states), N))
 
@@ -320,7 +315,6 @@ def q_learning_integrated(env, job_names, step_size_schedule='constant', alpha_c
 
         done = False
         while not done:
-            # Get valid actions using your existing functions
             valid_actions = get_valid_actions_indices(rddl_state)
 
             if not valid_actions:  # All jobs finished
@@ -375,7 +369,6 @@ def q_learning_integrated(env, job_names, step_size_schedule='constant', alpha_c
 
         # Calculate errors periodically
         if V_star is not None and (episode + 1) % error_check_interval == 0:
-            # Extract greedy policy from Q and evaluate it using your existing evaluate_policy function
             pi_from_q = []
             for s in all_states:
                 if all(s):  # Terminal state
@@ -388,7 +381,7 @@ def q_learning_integrated(env, job_names, step_size_schedule='constant', alpha_c
                     best_action = max(valid_acts, key=lambda a: Q[s_idx, a])
                     pi_from_q.append(best_action)
 
-            # Evaluate the greedy policy using your existing function
+            # Evaluate the greedy policy using  existing function
             V_pi_from_q = evaluate_policy(pi_from_q)
 
             error_inf = np.max(np.abs(V_star - V_pi_from_q))
@@ -400,12 +393,11 @@ def q_learning_integrated(env, job_names, step_size_schedule='constant', alpha_c
     return Q, errors_inf, errors_s0
 
 
-# Plotting functions (reusing your existing color scheme and style)
+# Plotting functions (reusing  existing color scheme and style)
 def plot_td_errors_integrated(errors_dict, title_suffix=""):
-    """Plot TD(0) errors using your existing plotting style."""
+    """Plot TD(0) errors """
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
 
-    # Use your existing color scheme
     colors = ['#6baed6', '#fd8d3c', '#31a354']
 
     for i, (schedule, (errors_inf, errors_s0)) in enumerate(errors_dict.items()):
@@ -430,7 +422,7 @@ def plot_td_errors_integrated(errors_dict, title_suffix=""):
 
 
 def plot_q_learning_errors_integrated(errors_dict, title_suffix=""):
-    """Plot Q-learning errors using your existing plotting style."""
+    """Plot Q-learning errors using  existing plotting style."""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
 
     colors = ['#6baed6', '#fd8d3c', '#31a354']
@@ -519,7 +511,7 @@ def run_learning_experiments_integrated():
         epsilon=0.01, V_star=V_star, num_episodes=5000
     )
 
-    # Compare ε = 0.1 vs ε = 0.01 using your plotting style
+    # Compare ε = 0.1 vs ε = 0.01
     print("Plotting epsilon comparison...")
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
 
@@ -530,8 +522,8 @@ def run_learning_experiments_integrated():
     ax1.semilogy(episodes, errors_inf_001, label='ε=0.01', color=colors[1])
     ax1.set_xlabel('episodes')
     ax1.set_ylabel('||V* - V_π_Q||_∞')
-    ax1.set_title(f'L-infinity Error Comparison ({favorite_name} schedule)', fontsize=16)
-    ax1.legend(loc='upper right')
+    ax1.set_title(f'Norm-INF Error Comparison ({favorite_name} schedule)', fontsize=16)
+    ax1.legend(loc='lower right')
     ax1.grid(axis='y', linestyle='--', alpha=0.7)
 
     ax2.semilogy(episodes, q_errors_01[favorite_name][1], label='ε=0.1', color=colors[0])
@@ -539,7 +531,7 @@ def run_learning_experiments_integrated():
     ax2.set_xlabel('episodes')
     ax2.set_ylabel('|V*(s0) - Q(s0,a*)|')
     ax2.set_title(f'Initial State Error Comparison ({favorite_name} schedule)', fontsize=16)
-    ax2.legend(loc='upper right')
+    ax2.legend(loc='lower right')
     ax2.grid(axis='y', linestyle='--', alpha=0.7)
 
     plt.tight_layout()
@@ -556,11 +548,9 @@ def run_learning_experiments_integrated():
     return td_errors, q_errors_01, (errors_inf_001, errors_s0_001)
 
 
-# Add this to your main execution block in your existing code
 def main_with_learning():
-    """Extended main function that includes your existing code plus learning experiments."""
+    """Extended main function """
 
-    # Run your existing experiments first
     print("--- Starting Question 2: The c-mu Rule ---")
 
     # πc policy
@@ -575,7 +565,6 @@ def main_with_learning():
     rewards_only = [x[0] for x in li]
     rewards_c = [np.mean(rewards_only[:i + 1]) for i in range(len(rewards_only))]
 
-    # Your existing simulation code for πcμ policy
     print("Running πcμ policy evaluation...")
     li2 = []
     for i in range(1000):
@@ -587,7 +576,6 @@ def main_with_learning():
     rewards_only2 = [x[0] for x in li2]
     rewards_cu = [np.cumsum(rewards_only2[:i + 1])[i] / (i + 1) for i in range(len(li2))]
 
-    # Your existing exact evaluation and policy iteration
     print("Computing exact value functions...")
     pi_c = make_pi_c()
     pi_cmu = make_pi_cmu()
@@ -596,9 +584,19 @@ def main_with_learning():
 
     pi_star, V_trace = policy_iteration(pi_c)
     V_star_final = V_trace[-1]
+    V_star_vector = evaluate_policy(pi_star)
 
-    # Your existing plots
     colors = ['#6baed6', '#fd8d3c', '#31a354']
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(1, len(rewards_c) + 1), rewards_c, label='πc', color=colors[2])
+    plt.legend(loc='upper right')
+    plt.title('Policy evaluation for V(S0) for πc over 1000 episodes', fontsize=16)
+    plt.xlabel('episodes')
+    plt.ylabel('reward')
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.savefig("policy_eval_cost_integrated.png")
+    print("Saved plot: policy_eval_cmu_cost_integrated.png")
 
     # Plot simulation results
     plt.figure(figsize=(10, 6))
@@ -613,20 +611,34 @@ def main_with_learning():
     plt.savefig("policy_eval_cmu_cost_integrated.png")
     print("Saved plot: policy_eval_cmu_cost_integrated.png")
 
-    # Plot value functions
-    plt.figure(figsize=(10, 6))
-    plt.plot(range(len(V_cmu)), V_cmu, label='V(πcμ)', color=colors[1])
-    # Plot the final optimal value (V_star is a scalar, so we need to get the full vector)
-    V_star_vector = evaluate_policy(pi_star)
-    plt.plot(range(len(V_star_vector)), V_star_vector, label='V(π*)', color=colors[2])
-    plt.legend(loc='upper right')
-    plt.title('Value function for πcμ and π*', fontsize=16)
-    plt.xlabel('state index')
-    plt.ylabel('value')
-    plt.grid(axis='y', linestyle='--', alpha=0.7)
-    plt.tight_layout()
-    plt.savefig("policy_eval_V_integrated.png")
-    print("Saved plot: policy_eval_V_integrated.png")
+
+
+    # Create a table comparing the value functions
+    import pandas as pd
+
+    # Create a DataFrame to store the state and value data
+    data = []
+    for i, state in enumerate(all_states):
+        # Convert boolean tuple to a readable string (e.g., (False, True, ...) -> "01...")
+        state_str = ''.join(['1' if x else '0' for x in state])
+        data.append({
+            'State': state_str,
+            'V(πcμ)': V_cmu[i],
+            'V(π*)': V_star_vector[i],
+            'V(πc)': V_c[i],
+        })
+
+    # Create DataFrame and format it
+    df = pd.DataFrame(data)
+    pd.set_option('display.precision', 4)  # Show 4 decimal places
+
+    # Print the table to console
+    print("\nValue Function Comparison Table:")
+    print(df.to_string(index=False))
+
+    # Save to CSV
+    df.to_csv("value_functions_comparison.csv", index=False)
+    print("Saved table to: value_functions_comparison.csv")
 
     # Plot policy iteration convergence
     plt.figure(figsize=(10, 6))
@@ -652,7 +664,6 @@ def main_with_learning():
     print("\n--- All Experiments Completed ---")
 
 
-# Replace your main execution block with this:
 if __name__ == "__main__":
     main_with_learning()
 
