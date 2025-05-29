@@ -6,19 +6,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pyRDDLGym import RDDLEnv
 
-DOMAIN   = "cmu_domain.rddl"
-INSTANCE = "cmu_n5.rddl"
 
-# ---------------------------------------------------------------------------
-# 1.  Load model and pull μ and c arrays
-# ---------------------------------------------------------------------------
-env    = RDDLEnv(domain=DOMAIN, instance=INSTANCE)
-model  = env.model
-jobs   = tuple(sorted(model.object_to_type))          # ('j1', 'j2', …)
-N      = len(jobs)
 
-MU     = np.array(model.non_fluents['MU'])
-COST   = np.array(model.non_fluents['COST'])
+
 
 # ---------------------------------------------------------------------------
 # 2.  Enumerate all states  (tuple of booleans, length N)
@@ -129,75 +119,4 @@ def run_q2_simulation_episode(env, policy_func, job_names_list,**kwargs):
 
     return total_reward, steps
 V_star   = V_trace[-1]
-
-def policy_simulate(num_of_episodes:int)
-    for i in range(num_of_episodes):
-
-        ep_total_reward, ep_steps = run_q2_simulation_episode(env_q2, random_policy_q2, JOB_NAMES_N5)
-
-# ---------------------------------------------------------------------------
-# 7.  Print summary
-# ---------------------------------------------------------------------------
-print("\nValue at initial state s₀ (no jobs finished)")
-print(f" π_c   (max cost) : {V_c[state_index[tuple([False]*N)]]:.2f}")
-print(f" cμ-law           : {V_cmu[state_index[tuple([False]*N)]]:.2f}")
-print(f" π*    (optimal)  : {V_star:.2f}")
-print(f"\nPolicy-iteration converged in {len(V_trace)-1} improvement step(s).")
-
-# ---------------------------------------------------------------------------
-# 8.  Plot convergence
-# ---------------------------------------------------------------------------
-plt.figure(figsize=(6,4))
-plt.plot(V_trace, marker='o')
-# plt.axhline(V_c[state_index[tuple([False]*N)]],   ls='--', c='C1', label='π_c')
-# plt.axhline(V_cmu[state_index[tuple([False]*N)]], ls='--', c='C2', label='cμ-law')
-plt.xlabel('Policy-iteration step')
-plt.ylabel('V(s₀)')
-plt.title('Convergence starting from π_c')
-plt.legend()
-plt.tight_layout()
-plt.savefig("convergence.png")
-print("Saved plot: convergence.png")
-
-
-# Gather all non-terminal states
-non_term_states = [s for s in all_states if not all(s)]
-N_nt = len(non_term_states)
-
-# 5.1 Count agreements
-agree = 0
-diffs = []
-for s in non_term_states:
-    idx = state_index[s]
-    a_star = pi_star[idx]
-    a_mu   = pi_cmu[idx]
-    if a_star == a_mu:
-        agree += 1
-    else:
-        diffs.append((s, a_mu, a_star))
-
-print(f"\nπ* vs cμ-law: {agree}/{N_nt} states agree ({agree/N_nt:.1%})")
-if diffs:
-    print("\nStates where π* ≠ π_cμ:")
-    for s, a_mu, a_star in diffs:
-        print(f"  {s} : π_cμ→j{a_mu+1}, π*→j{a_star+1}")
-
-# 5.2 Scatter plot of actions
-plt.figure(figsize=(5,5))
-x = [pi_cmu[state_index[s]] for s in non_term_states]
-y = [pi_star[state_index[s]] for s in non_term_states]
-colors = ['green' if xi==yi else 'red' for xi,yi in zip(x,y)]
-plt.scatter(x, y, c=colors, s=80, edgecolors='k')
-plt.plot([0,N-1],[0,N-1],'k--', lw=1)
-plt.xlabel('π_cμ(s) (job index)')
-plt.ylabel('π*(s) (job index)')
-plt.title('Action comparison: cμ-law vs optimal')
-plt.xlim(-0.5, N-0.5)
-plt.ylim(-0.5, N-0.5)
-plt.xticks(range(N), [f"j{i+1}" for i in range(N)])
-plt.yticks(range(N), [f"j{i+1}" for i in range(N)])
-plt.grid(True, linestyle=':', alpha=0.7)
-plt.tight_layout()
-plt.savefig("comaprsion.png")
-
 

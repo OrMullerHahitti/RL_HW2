@@ -54,7 +54,6 @@ class GreedyExploreExploitAgent(BanditAgent):
         self.sum_rewards = np.zeros(self.n_arms, dtype=float)
         self.empirical_means = np.zeros(self.n_arms, dtype=float)
         
-        # For managing the exploration phase systematically
         self.current_explore_arm_idx = 0
         self.pulls_for_current_explore_arm = 0
         self.best_arm_name_after_exploration = None # Reset for new experiment
@@ -68,9 +67,7 @@ class GreedyExploreExploitAgent(BanditAgent):
         else:
             # Exploitation phase
             if self.best_arm_name_after_exploration is None: 
-                # This should only happen once, right after exploration finishes
                 if np.sum(self.pull_counts) == 0: # Should not happen if exploration was done
-                    # Fallback: choose a random arm if somehow no exploration data
                     return self.arm_names[random.randint(0, self.n_arms - 1)]
                 best_idx = np.argmax(self.empirical_means)
                 self.best_arm_name_after_exploration = self.arm_names[best_idx]
@@ -84,19 +81,12 @@ class GreedyExploreExploitAgent(BanditAgent):
         # Always update empirical mean after a pull
         self.empirical_means[arm_idx] = self.sum_rewards[arm_idx] / self.pull_counts[arm_idx]
 
-        # Logic for exploration phase progression
         if timestep <= self.total_explore_steps:
             self.pulls_for_current_explore_arm += 1
             if self.pulls_for_current_explore_arm >= self.explore_pulls_per_arm:
-                # Move to the next arm for exploration
                 self.current_explore_arm_idx += 1
                 self.pulls_for_current_explore_arm = 0
-                # Ensure current_explore_arm_idx doesn't exceed bounds if logic is perfect
-                # This check is mostly for safety; total_explore_steps should handle the phase transition.
                 if self.current_explore_arm_idx >= self.n_arms and timestep < self.total_explore_steps:
-                    # This implies exploration of all arms finished exactly,
-                    # and next step will be > self.total_explore_steps.
-                    # Or, if there's a slight mismatch, clamp to last arm.
                     self.current_explore_arm_idx = self.n_arms - 1
 
 

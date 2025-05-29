@@ -4,16 +4,14 @@ domain simple_bandit {
     };
 
     pvariables {
-        // Non-fluents: Arm properties
+        //  Arm properties
         PROB(arm) : {non-fluent, real, default = 0.0}; // Probability of reward for pulling an arm
 
-        // Action-fluents: Which arm to pull
+        //  Which arm to pull
         choose_arm(arm) : {action-fluent, bool, default = false};
     };
 
-    // CPFs block - often required even if empty
     cpfs {
-        // No state-fluents are defined in this RDDL domain whose values change over time.
     };
 
     // Reward: stochastic reward from the chosen arm
