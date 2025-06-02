@@ -601,12 +601,11 @@ def main_with_learning():
 
     colors = ['#6baed6', '#fd8d3c', '#31a354']
     plt.figure(figsize=(10, 6))
-    plt.plot(range(1, len(rewards_c) + 1), np.abs(rewards_c) , label='πc', color=colors[2])
+    plt.plot(range(1, len(rewards_c) + 1), rewards_c, label='πc', color=colors[2])
     plt.legend(loc='upper right')
-    plt.title('Estimated Value of S0 - πc', fontsize=16)
+    plt.title('Policy evaluation for V(S0) for πc over 1000 episodes', fontsize=16)
     plt.xlabel('episodes')
-    plt.ylabel('cost')
-    plt.xticks([0,1,2])
+    plt.ylabel('reward')
     plt.grid(axis='y', linestyle='--', alpha=0.7)
     plt.tight_layout()
     plt.savefig("policy_eval_cost_integrated.png")
@@ -614,15 +613,15 @@ def main_with_learning():
 
     # Plot simulation results
     plt.figure(figsize=(10, 6))
-    plt.plot(range(1, len(rewards_cu) + 1), np.abs(rewards_cu), label='πcμ', color=colors[0])
-    plt.plot(range(1, len(rewards_c) + 1), np.abs(rewards_c), label='πc', color=colors[1])
+    plt.plot(range(1, len(rewards_cu) + 1), rewards_cu, label='πcμ', color=colors[0])
+    plt.plot(range(1, len(rewards_c) + 1), rewards_c, label='πc', color=colors[1])
     plt.legend(loc='upper right')
-    plt.title('Estimated Value of S0 - π*  Vs. πc', fontsize=16)
+    plt.title('Policy evaluation for cμ and cost over 1000 episodes', fontsize=16)
     plt.xlabel('episodes')
-    plt.ylabel('cost')
+    plt.ylabel('reward')
     plt.grid(axis='y', linestyle='--', alpha=0.7)
     plt.tight_layout()
-    plt.savefig("estimated_value_of_V(S0)-pi_star_vs_pi_c.png")
+    plt.savefig("policy_eval_cmu_cost_integrated.png")
     print("Saved plot: policy_eval_cmu_cost_integrated.png")
 
 
