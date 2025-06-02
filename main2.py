@@ -656,7 +656,7 @@ def main_with_learning():
     plt.figure(figsize=(10, 6))
     plt.plot(range(len(V_trace)), V_trace, label='V(π*)', color=colors[0])
     plt.legend(loc='upper right')
-    plt.title('Convergence of V(s0) Across Policy‐Iteration Steps', fontsize=16)
+    plt.title('Convergence of V(s0) Across Policy‐Iteration Steps', fontsize=16)
     plt.xlabel('iteration')
     plt.ylabel('value')
     plt.grid(axis='y', linestyle='--', alpha=0.7)
