@@ -4,21 +4,18 @@ domain simple_bandit {
     };
 
     pvariables {
-        //  Arm properties
         PROB(arm) : {non-fluent, real, default = 0.0}; // Probability of reward for pulling an arm
-
-        //  Which arm to pull
         choose_arm(arm) : {action-fluent, bool, default = false};
     };
 
     cpfs {
     };
 
-    // Reward: stochastic reward from the chosen arm
     reward = sum_{?a : arm} (if (choose_arm(?a)) then Bernoulli(PROB(?a)) else 0.0);
 
     action-preconditions {
 
-        (sum_{?a : arm} (choose_arm(?a))) == 1;
+        sum_{?a : arm} [choose_arm(?a)] == 1;
+
     };
 }

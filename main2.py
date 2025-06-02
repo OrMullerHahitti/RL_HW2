@@ -219,7 +219,7 @@ def action_idx_to_rddl(action_idx, job_names):
     return {f"process_job___{job_name}": True}
 
 
-def td_0_policy_evaluation_improved(env, policy_func, job_names, costs_arr,
+def td_0_policy_evaluation(env, policy_func, job_names, costs_arr,
                                     step_size_schedule='constant', alpha_constant=0.01,
                                     num_episodes=1000, V_true=None, gamma=1.0):
     """
@@ -270,7 +270,7 @@ def td_0_policy_evaluation_improved(env, policy_func, job_names, costs_arr,
                 raise ValueError(f"Unknown step size schedule: {step_size_schedule}")
 
             # TD(0) update
-            td_target = reward + gamma * V[next_state_idx]
+            td_target = np.abs(reward) + gamma * V[next_state_idx]
             td_error = td_target - V[state_idx]
             V[state_idx] += alpha * td_error
 
@@ -327,7 +327,7 @@ def q_learning_integrated(env, job_names, step_size_schedule='constant', alpha_c
             else:
                 # Exploit: choose best valid action according to Q
                 q_values_valid = [(a, Q[state_idx, a]) for a in valid_actions]
-                action_idx = max(q_values_valid, key=lambda x: x[1])[0]
+                action_idx = min(q_values_valid, key=lambda x: x[1])[0]
 
             # Convert action to RDDL format
             action_dict = action_idx_to_rddl(action_idx, job_names)
@@ -353,11 +353,11 @@ def q_learning_integrated(env, job_names, step_size_schedule='constant', alpha_c
             # Q-learning update
             next_valid_actions = get_valid_actions_indices(next_rddl_state)
             if next_valid_actions:  # Not terminal
-                max_next_q = max(Q[next_state_idx, a] for a in next_valid_actions)
+                min_next_q = min(Q[next_state_idx, a] for a in next_valid_actions)
             else:  # Terminal state
-                max_next_q = 0.0
+                min_next_q = 0.0
 
-            td_target = reward + gamma * max_next_q
+            td_target = np.abs(reward) + gamma * min_next_q
             td_error = td_target - Q[state_idx, action_idx]
             Q[state_idx, action_idx] += alpha * td_error
 
@@ -378,7 +378,7 @@ def q_learning_integrated(env, job_names, step_size_schedule='constant', alpha_c
                     valid_acts = [i for i, finished in enumerate(s) if not finished]
                     s_idx = state_index[s]
                     # Choose action with highest Q-value
-                    best_action = max(valid_acts, key=lambda a: Q[s_idx, a])
+                    best_action = min(valid_acts, key=lambda a: Q[s_idx, a])
                     pi_from_q.append(best_action)
 
             # Evaluate the greedy policy using  existing function
@@ -402,19 +402,22 @@ def plot_td_errors_integrated(errors_dict, title_suffix=""):
 
     for i, (schedule, (errors_inf, errors_s0)) in enumerate(errors_dict.items()):
         episodes = range(1, len(errors_inf) + 1)
-        ax1.semilogy(episodes, errors_inf, label=f'{schedule}', color=colors[i])
-        ax2.semilogy(episodes, errors_s0, label=f'{schedule}', color=colors[i])
+        ax1.plot(episodes, errors_inf, label=f'{schedule}', color=colors[i])
+        ax2.plot(episodes, errors_s0, label=f'{schedule}', color=colors[i])
 
     ax1.set_xlabel('episodes')
     ax1.set_ylabel('||V_true - V_TD||_∞')
-    ax1.set_title(f'L-infinity Error {title_suffix}', fontsize=16)
+    ax1.set_title(f'Max Error {title_suffix}', fontsize=16)
     ax1.legend(loc='upper right')
+    ax1.set_ylim(bottom=260)
     ax1.grid(axis='y', linestyle='--', alpha=0.7)
 
     ax2.set_xlabel('episodes')
     ax2.set_ylabel('|V_true(s0) - V_TD(s0)|')
     ax2.set_title(f'Initial State Error {title_suffix}', fontsize=16)
     ax2.legend(loc='upper right')
+    ax2.set_ylim(bottom=0)
+
     ax2.grid(axis='y', linestyle='--', alpha=0.7)
 
     plt.tight_layout()
@@ -429,19 +432,23 @@ def plot_q_learning_errors_integrated(errors_dict, title_suffix=""):
 
     for i, (schedule, (errors_inf, errors_s0)) in enumerate(errors_dict.items()):
         episodes = [100 * (i + 1) for i in range(len(errors_inf))]
-        ax1.semilogy(episodes, errors_inf, label=f'{schedule}', color=colors[i])
-        ax2.semilogy(episodes, errors_s0, label=f'{schedule}', color=colors[i])
+        ax1.plot(episodes, errors_inf, label=f'{schedule}', color=colors[i])
+        ax2.plot(episodes, errors_s0, label=f'{schedule}', color=colors[i])
 
     ax1.set_xlabel('episodes')
     ax1.set_ylabel('||V* - V_π_Q||_∞')
-    ax1.set_title(f'L-infinity Error {title_suffix}', fontsize=16)
+    ax1.set_title(f'NORM-infinity Error {title_suffix}', fontsize=16)
     ax1.legend(loc='upper right')
+    ax1.set_ylim(bottom=0)
+
     ax1.grid(axis='y', linestyle='--', alpha=0.7)
 
     ax2.set_xlabel('episodes')
     ax2.set_ylabel('|V*(s0) - Q(s0,a*)|')
     ax2.set_title(f'Initial State Error {title_suffix}', fontsize=16)
     ax2.legend(loc='upper right')
+    ax2.set_ylim(bottom=1e-4)
+
     ax2.grid(axis='y', linestyle='--', alpha=0.7)
 
     plt.tight_layout()
@@ -454,7 +461,10 @@ def run_learning_experiments_integrated():
     print("Computing reference value functions using existing functions...")
     pi_c = make_pi_c()
     V_c_true = evaluate_policy(pi_c)
-
+    #0,1,5,13,15
+    # zero_indices = [2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 14,16,17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29,30,31]
+    # for i in zero_indices:
+    #     V_c_true[i] = 0  # Set these indices to zero as per the problem statement
     pi_star, V_trace = policy_iteration(pi_c)
     V_star = evaluate_policy(pi_star)
 
@@ -470,7 +480,7 @@ def run_learning_experiments_integrated():
 
     for i, schedule in enumerate(step_schedules):
         print(f"Running TD(0) with {schedule_names[i]} step-size schedule...")
-        V_td, errors_inf, errors_s0, _ = td_0_policy_evaluation_improved(
+        V_td, errors_inf, errors_s0, _ = td_0_policy_evaluation(
             env, max_cost_policy_q2, JOB_NAMES_N5, COST,
             step_size_schedule=schedule, V_true=V_c_true, num_episodes=2000
         )
@@ -518,17 +528,20 @@ def run_learning_experiments_integrated():
     episodes = [100 * (i + 1) for i in range(len(errors_inf_001))]
     colors = ['#6baed6', '#fd8d3c']
 
-    ax1.semilogy(episodes, q_errors_01[favorite_name][0], label='ε=0.1', color=colors[0])
-    ax1.semilogy(episodes, errors_inf_001, label='ε=0.01', color=colors[1])
+    ax1.plot(episodes, q_errors_01[favorite_name][0], label='ε=0.1', color=colors[0])
+    ax1.plot(episodes, errors_inf_001, label='ε=0.01', color=colors[1])
     ax1.set_xlabel('episodes')
+    ax1.set_ylim(bottom=0)
     ax1.set_ylabel('||V* - V_π_Q||_∞')
     ax1.set_title(f'Norm-INF Error Comparison ({favorite_name} schedule)', fontsize=16)
     ax1.legend(loc='lower right')
     ax1.grid(axis='y', linestyle='--', alpha=0.7)
 
-    ax2.semilogy(episodes, q_errors_01[favorite_name][1], label='ε=0.1', color=colors[0])
-    ax2.semilogy(episodes, errors_s0_001, label='ε=0.01', color=colors[1])
+    ax2.plot(episodes, q_errors_01[favorite_name][1], label='ε=0.1', color=colors[0])
+    ax2.plot(episodes, errors_s0_001, label='ε=0.01', color=colors[1])
     ax2.set_xlabel('episodes')
+    ax2.set_ylim(bottom=0)
+
     ax2.set_ylabel('|V*(s0) - Q(s0,a*)|')
     ax2.set_title(f'Initial State Error Comparison ({favorite_name} schedule)', fontsize=16)
     ax2.legend(loc='lower right')
@@ -588,11 +601,12 @@ def main_with_learning():
 
     colors = ['#6baed6', '#fd8d3c', '#31a354']
     plt.figure(figsize=(10, 6))
-    plt.plot(range(1, len(rewards_c) + 1), rewards_c, label='πc', color=colors[2])
+    plt.plot(range(1, len(rewards_c) + 1), np.abs(rewards_c) , label='πc', color=colors[2])
     plt.legend(loc='upper right')
-    plt.title('Policy evaluation for V(S0) for πc over 1000 episodes', fontsize=16)
+    plt.title('Estimated Value of S0 - πc', fontsize=16)
     plt.xlabel('episodes')
-    plt.ylabel('reward')
+    plt.ylabel('cost')
+    plt.xticks([0,1,2])
     plt.grid(axis='y', linestyle='--', alpha=0.7)
     plt.tight_layout()
     plt.savefig("policy_eval_cost_integrated.png")
@@ -600,15 +614,15 @@ def main_with_learning():
 
     # Plot simulation results
     plt.figure(figsize=(10, 6))
-    plt.plot(range(1, len(rewards_cu) + 1), rewards_cu, label='πcμ', color=colors[0])
-    plt.plot(range(1, len(rewards_c) + 1), rewards_c, label='πc', color=colors[1])
+    plt.plot(range(1, len(rewards_cu) + 1), np.abs(rewards_cu), label='πcμ', color=colors[0])
+    plt.plot(range(1, len(rewards_c) + 1), np.abs(rewards_c), label='πc', color=colors[1])
     plt.legend(loc='upper right')
-    plt.title('Policy evaluation for cμ and cost over 1000 episodes', fontsize=16)
+    plt.title('Estimated Value of S0 - π*  Vs. πc', fontsize=16)
     plt.xlabel('episodes')
-    plt.ylabel('reward')
+    plt.ylabel('cost')
     plt.grid(axis='y', linestyle='--', alpha=0.7)
     plt.tight_layout()
-    plt.savefig("policy_eval_cmu_cost_integrated.png")
+    plt.savefig("estimated_value_of_V(S0)-pi_star_vs_pi_c.png")
     print("Saved plot: policy_eval_cmu_cost_integrated.png")
 
 
@@ -619,7 +633,6 @@ def main_with_learning():
     # Create a DataFrame to store the state and value data
     data = []
     for i, state in enumerate(all_states):
-        # Convert boolean tuple to a readable string (e.g., (False, True, ...) -> "01...")
         state_str = ''.join(['1' if x else '0' for x in state])
         data.append({
             'State': state_str,
@@ -644,7 +657,7 @@ def main_with_learning():
     plt.figure(figsize=(10, 6))
     plt.plot(range(len(V_trace)), V_trace, label='V(π*)', color=colors[0])
     plt.legend(loc='upper right')
-    plt.title('Value function for π* over iterations', fontsize=16)
+    plt.title('Convergence of V(s0) Across Policy‐Iteration Steps', fontsize=16)
     plt.xlabel('iteration')
     plt.ylabel('value')
     plt.grid(axis='y', linestyle='--', alpha=0.7)
